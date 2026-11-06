@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Pressable, ScrollView, StatusBar, StyleSheet,
   Text, TextInput, View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import PrototypeScreens from "./PrototypeScreens";
 
@@ -41,7 +41,7 @@ function AppContent() {
   const [detail, setDetail] = useState("");
 
   const clearSession = useCallback(async () => {
-    try { await AsyncStorage.removeItem(SESSION_KEY); } catch { /* storage may be unavailable */ }
+    try { await SecureStore.deleteItemAsync(SESSION_KEY); } catch { /* storage may be unavailable */ }
     setToken(""); setUser(undefined); setAuthenticated(false); setDemoMode(false);
     setPassword(""); setDetail(""); setSection("Inicio");
   }, []);
@@ -49,7 +49,7 @@ function AppContent() {
   const restoreSession = useCallback(async () => {
     setRestoring(true); setError("");
     try {
-      const raw = await AsyncStorage.getItem(SESSION_KEY);
+      const raw = await SecureStore.getItemAsync(SESSION_KEY);
       if (!raw) return;
       let saved: Session;
       try { saved = JSON.parse(raw); } catch { await AsyncStorage.removeItem(SESSION_KEY); return; }
@@ -83,7 +83,7 @@ function AppContent() {
       const data = await readJson(response);
       if (typeof data.token !== "string" || !data.token) throw new Error("El servidor no ha devuelto una sesión válida.");
       const nextSession: Session = { token: data.token, user: data.user };
-      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+      await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextSession));
       setToken(data.token); setUser(data.user); setUsername(data.user?.username || data.user?.name || username.trim());
       setAuthenticated(true); setDemoMode(false); setPassword(""); setError("");
     } catch (e) {
