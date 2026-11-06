@@ -1,3 +1,4 @@
+import PrototypeScreens from "./PrototypeScreens";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator, Pressable, ScrollView, StatusBar, StyleSheet,
