@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "DammPulse 360",
+    "slug": "dammpulse-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dammpulse.mobile"
+    },
+    "android": {
+      "package": "com.dammpulse.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-status-bar"
+    ],
+    "extra": {
+      "apiBaseUrl": "https://dammpulse-api-production.up.railway.app"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
+  }
+}
