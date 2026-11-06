@@ -20,6 +20,10 @@ jobs:
           java-version: 17
       - name: Install dependencies
         run: npm install
+      - name: Align Expo SDK native dependencies
+        run: npx expo install --fix
+      - name: TypeScript check
+        run: npx tsc --noEmit
       - name: Generate native Android project
         run: npx expo prebuild --platform android --non-interactive
       - name: Build installable debug APK
