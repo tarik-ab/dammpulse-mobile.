@@ -52,13 +52,13 @@ function AppContent() {
       const raw = await SecureStore.getItemAsync(SESSION_KEY);
       if (!raw) return;
       let saved: Session;
-      try { saved = JSON.parse(raw); } catch { await AsyncStorage.removeItem(SESSION_KEY); return; }
-      if (!saved?.token) { await AsyncStorage.removeItem(SESSION_KEY); return; }
+      try { saved = JSON.parse(raw); } catch { await SecureStore.deleteItemAsync(SESSION_KEY); return; }
+      if (!saved?.token) { await SecureStore.deleteItemAsync(SESSION_KEY); return; }
       const response = await fetch(`${API_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${saved.token}`, Accept: "application/json" },
       });
       if (response.status === 401 || response.status === 403) {
-        await AsyncStorage.removeItem(SESSION_KEY); return;
+        await SecureStore.deleteItemAsync(SESSION_KEY); return;
       }
       const data = await readJson(response);
       setToken(saved.token); setUser(data.user || saved.user); setUsername(data.user?.username || data.user?.name || "");
