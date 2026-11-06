@@ -17,9 +17,6 @@
       },
       "edgeToEdgeEnabled": true
     },
-    "plugins": [
-      "expo-status-bar"
-    ],
     "extra": {
       "apiBaseUrl": "https://dammpulse-api-production.up.railway.app"
     },
