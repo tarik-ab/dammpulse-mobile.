@@ -96,7 +96,7 @@ function AppContent() {
           <View style={styles.grid}>{cards.map(card => <Pressable key={card.title} onPress={() => open(card.target)} style={({pressed})=>[styles.moduleCard,pressed&&styles.pressed]}><View style={styles.moduleIcon}><Text style={styles.moduleIconText}>{card.icon}</Text></View><Text style={styles.moduleTitle}>{card.title}</Text><Text style={styles.moduleSubtitle}>{card.subtitle}</Text><Text style={styles.cardArrow}>Abrir  →</Text></Pressable>)}</View>
         </> : <>
           <Pressable onPress={() => { setDetail(""); setSection("Inicio"); }} style={styles.back}><Text style={styles.backText}>‹  Volver al inicio</Text></Pressable>
-          <View style={styles.detailPanel}><View style={styles.detailIcon}><Text style={styles.moduleIconText}>{cards.find(c=>c.target===title)?.icon || "✦"}</Text></View><Text style={styles.detailTitle}>{title}</Text><Text style={styles.detailText}>Prototipo móvil en desarrollo.</Text>
+          <View style={styles.detailPanel}><View style={styles.detailIcon}><Text style={styles.moduleIconText}>{cards.find(c=>c.target===title)?.icon || "✦"}</Text></View><Text style={styles.detailTitle}>{title}</Text><Text style={styles.detailText}>Contenido del módulo</Text><PrototypeScreens name={title} />
           {title === "DAM Bot" && <Text style={styles.note}>El asistente se conectará a los servicios disponibles de la plataforma.</Text>}
           <Pressable onPress={() => { setDetail(""); setSection("Inicio"); }} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Volver al panel  →</Text></Pressable></View>
         </>}
