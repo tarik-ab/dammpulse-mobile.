@@ -66,14 +66,14 @@ function AppContent() {
     );
   }
 
-  const cards = useMemo(() => [
+  const cards = [
     { title: "Equipos y QR", subtitle: "Consulta equipos y accede a su información", icon: "▦", target: "Equipos" },
     { title: "Incidencias", subtitle: "Registra y sigue avisos de mantenimiento", icon: "⚑", target: "Incidencias" },
     { title: "Academia", subtitle: "Formación y aprendizaje", icon: "▤", target: "Academia" },
     { title: "Conocimiento experto", subtitle: "Procedimientos y documentación", icon: "✧", target: "Conocimiento experto" },
     { title: "Producto Damm", subtitle: "Información y recursos de producto", icon: "◈", target: "Producto Damm" },
     { title: "DAM Bot", subtitle: "Asistente de ayuda de la plataforma", icon: "✳", target: "DAM Bot" },
-  ], []);
+  ];
 
   function open(target: string) {
     setDetail(target);
