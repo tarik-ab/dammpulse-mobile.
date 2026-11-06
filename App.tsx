@@ -1,48 +1,101 @@
-import PrototypeScreens from "./PrototypeScreens";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator, Pressable, ScrollView, StatusBar, StyleSheet,
   Text, TextInput, View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import PrototypeScreens from "./PrototypeScreens";
 
 const API_URL = "https://dammpulse-api-production.up.railway.app";
+const SESSION_KEY = "dammpulse.session.v1";
 const RED = "#E30613";
 type Section = "Inicio" | "Equipos" | "Incidencias" | "Academia" | "Más";
+type SessionUser = { name?: string; username?: string; email?: string; role?: string };
+type Session = { token: string; user?: SessionUser };
 const tabs: { label: Section; icon: string }[] = [
   { label: "Inicio", icon: "⌂" }, { label: "Equipos", icon: "▦" },
   { label: "Incidencias", icon: "⚑" }, { label: "Academia", icon: "▤" },
   { label: "Más", icon: "•••" },
 ];
 
+async function readJson(response: Response) {
+  const body = await response.text();
+  let data: any = {};
+  try { data = body ? JSON.parse(body) : {}; } catch { /* invalid server response */ }
+  if (!response.ok) throw new Error(data.error || data.message || `Error del servidor (${response.status}).`);
+  return data;
+}
+
 function AppContent() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
+  const [user, setUser] = useState<SessionUser | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [section, setSection] = useState<Section>("Inicio");
   const [detail, setDetail] = useState("");
 
+  const clearSession = useCallback(async () => {
+    try { await AsyncStorage.removeItem(SESSION_KEY); } catch { /* storage may be unavailable */ }
+    setToken(""); setUser(undefined); setAuthenticated(false); setDemoMode(false);
+    setPassword(""); setDetail(""); setSection("Inicio");
+  }, []);
+
+  const restoreSession = useCallback(async () => {
+    setRestoring(true); setError("");
+    try {
+      const raw = await AsyncStorage.getItem(SESSION_KEY);
+      if (!raw) return;
+      let saved: Session;
+      try { saved = JSON.parse(raw); } catch { await AsyncStorage.removeItem(SESSION_KEY); return; }
+      if (!saved?.token) { await AsyncStorage.removeItem(SESSION_KEY); return; }
+      const response = await fetch(`${API_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${saved.token}`, Accept: "application/json" },
+      });
+      if (response.status === 401 || response.status === 403) {
+        await AsyncStorage.removeItem(SESSION_KEY); return;
+      }
+      const data = await readJson(response);
+      setToken(saved.token); setUser(data.user || saved.user); setUsername(data.user?.username || data.user?.name || "");
+      setAuthenticated(true); setDemoMode(false);
+    } catch {
+      // Preserve the saved token on temporary network failure; user can retry without losing the session.
+      setError("No se ha podido comprobar la sesión. Comprueba tu conexión y vuelve a intentarlo.");
+    } finally { setRestoring(false); }
+  }, []);
+
+  useEffect(() => { void restoreSession(); }, [restoreSession]);
+
   async function signIn() {
-    if (!username.trim() || !password) { setError("Introduce tu usuario y contraseña."); return; }
+    if (!username.trim() || !password) { setError("Introduce tu usuario o correo y contraseña."); return; }
     setBusy(true); setError("");
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ identifier: username.trim(), password }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || data.error || "No se ha podido iniciar sesión.");
-      setToken(data.token || data.accessToken || "");
-      setAuthenticated(true);
+      const data = await readJson(response);
+      if (typeof data.token !== "string" || !data.token) throw new Error("El servidor no ha devuelto una sesión válida.");
+      const nextSession: Session = { token: data.token, user: data.user };
+      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+      setToken(data.token); setUser(data.user); setUsername(data.user?.username || data.user?.name || username.trim());
+      setAuthenticated(true); setDemoMode(false); setPassword(""); setError("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error de conexión con el servidor.");
+      setError(e instanceof Error ? e.message : "No se ha podido conectar con el servidor.");
     } finally { setBusy(false); }
   }
 
-  if (!authenticated) {
+  if (restoring) {
+    return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" /><View style={styles.loading}><ActivityIndicator size="large" color={RED}/><Text style={styles.muted}>Comprobando sesión…</Text></View></SafeAreaView>;
+  }
+
+  if (!authenticated && !demoMode) {
     return (
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="dark-content" />
@@ -52,16 +105,16 @@ function AppContent() {
           <Text style={styles.logo}>DammPulse <Text style={styles.logoRed}>360</Text></Text>
           <Text style={styles.loginTitle}>Bienvenido</Text>
           <Text style={styles.muted}>Accede a tu espacio de trabajo.</Text>
-          <Text style={styles.fieldLabel}>USUARIO</Text>
-          <TextInput value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="Tu usuario" placeholderTextColor="#9A9A9A" style={styles.input} />
+          <Text style={styles.fieldLabel}>USUARIO O CORREO</Text>
+          <TextInput value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} autoComplete="username" textContentType="username" returnKeyType="next" placeholder="Tu usuario o correo" placeholderTextColor="#9A9A9A" style={styles.input} />
           <Text style={styles.fieldLabel}>CONTRASEÑA</Text>
-          <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="Tu contraseña" placeholderTextColor="#9A9A9A" style={styles.input} onSubmitEditing={signIn} />
-          {!!error && <Text style={styles.error}>{error}</Text>}
-          <Pressable onPress={signIn} disabled={busy} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}>
+          <TextInput value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" textContentType="password" returnKeyType="go" placeholder="Tu contraseña" placeholderTextColor="#9A9A9A" style={styles.input} onSubmitEditing={signIn} />
+          {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+          <Pressable accessibilityRole="button" onPress={signIn} disabled={busy} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Entrar  →</Text>}
           </Pressable>
-          <Pressable onPress={() => { setUsername(username || "Invitado"); setAuthenticated(true); setError(""); }} style={{marginTop:14,padding:15,borderRadius:13,borderWidth:1,borderColor:"#DDDDDD",backgroundColor:"#FFFFFF",alignItems:"center"}}><Text style={{fontSize:13,fontWeight:"800",color:"#333"}}>Entrar en modo demostración</Text></Pressable>
-          <Text style={styles.loginFoot}>El modo demostración utiliza datos locales de ejemplo.</Text>
+          <Pressable onPress={() => { setDemoMode(true); setUsername("Invitado"); setError(""); }} style={styles.demoButton}><Text style={styles.demoButtonText}>Entrar en modo demostración</Text></Pressable>
+          <Text style={styles.loginFoot}>La demostración usa contenido local de ejemplo y no inicia sesión en la plataforma.</Text>
         </ScrollView>
       </SafeAreaView>
     );
@@ -88,28 +141,30 @@ function AppContent() {
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <View><Text style={styles.headerEyebrow}>DAMMPULSE 360</Text><Text style={styles.headerTitle}>{title}</Text></View>
-        <Pressable onPress={() => { setAuthenticated(false); setPassword(""); setToken(""); setDetail(""); }} style={styles.avatar}><Text style={styles.avatarText}>{username.slice(0,1).toUpperCase() || "U"}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sesión" onPress={() => { void clearSession(); }} style={styles.avatar}><Text style={styles.avatarText}>{(user?.name || username).slice(0,1).toUpperCase() || "U"}</Text></Pressable>
       </View>
+      {demoMode && <View style={styles.demoBanner}><Text style={styles.demoBannerText}>MODO DEMOSTRACIÓN · DATOS DE EJEMPLO · SIN CONEXIÓN A CUENTA</Text></View>}
       <ScrollView contentContainerStyle={styles.content}>
         {section === "Inicio" && !detail ? <>
           <View style={styles.hero}><Text style={styles.heroEyebrow}>TU ENTORNO DE TRABAJO</Text><Text style={styles.heroTitle}>Todo conectado.{"\n"}Todo bajo control.</Text><Text style={styles.heroText}>Accede rápidamente a las herramientas de tu planta.</Text><View style={styles.heroAccent} /></View>
           <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Accesos directos</Text><Text style={styles.sectionHint}>Selecciona un módulo</Text></View>
-          <View style={styles.grid}>{cards.map(card => <Pressable key={card.title} onPress={() => open(card.target)} style={({pressed})=>[styles.moduleCard,pressed&&styles.pressed]}><View style={styles.moduleIcon}><Text style={styles.moduleIconText}>{card.icon}</Text></View><Text style={styles.moduleTitle}>{card.title}</Text><Text style={styles.moduleSubtitle}>{card.subtitle}</Text><Text style={styles.cardArrow}>Abrir  →</Text></Pressable>)}</View>
+          <View style={styles.grid}>{cards.map(card => <Pressable key={card.title} accessibilityRole="button" onPress={() => open(card.target)} style={({pressed})=>[styles.moduleCard,pressed&&styles.pressed]}><View style={styles.moduleIcon}><Text style={styles.moduleIconText}>{card.icon}</Text></View><Text style={styles.moduleTitle}>{card.title}</Text><Text style={styles.moduleSubtitle}>{card.subtitle}</Text><Text style={styles.cardArrow}>Abrir  →</Text></Pressable>)}</View>
         </> : <>
           <Pressable onPress={() => { setDetail(""); setSection("Inicio"); }} style={styles.back}><Text style={styles.backText}>‹  Volver al inicio</Text></Pressable>
           <View style={styles.detailPanel}><View style={styles.detailIcon}><Text style={styles.moduleIconText}>{cards.find(c=>c.target===title)?.icon || "✦"}</Text></View><Text style={styles.detailTitle}>{title}</Text><Text style={styles.detailText}>Contenido del módulo</Text><PrototypeScreens name={title} />
-          {title === "DAM Bot" && <Text style={styles.note}>El asistente se conectará a los servicios disponibles de la plataforma.</Text>}
+          {title === "DAM Bot" && <Text style={styles.note}>El asistente todavía no está conectado a un modelo ni a documentación corporativa. No introduzcas información confidencial en esta demostración.</Text>}
+          {title !== "DAM Bot" && <Text style={styles.note}>Contenido de muestra. Este módulo aún no está conectado a registros operativos compartidos.</Text>}
           <Pressable onPress={() => { setDetail(""); setSection("Inicio"); }} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Volver al panel  →</Text></Pressable></View>
         </>}
         <Text style={styles.footer}>DAMMPULSE 360  ·  MOBILE</Text>
       </ScrollView>
-      <View style={styles.tabBar}>{tabs.map(tab=><Pressable key={tab.label} onPress={()=>{setSection(tab.label);setDetail("");}} style={styles.tab}><Text style={[styles.tabIcon,section===tab.label&&styles.tabActive]}>{tab.icon}</Text><Text style={[styles.tabLabel,section===tab.label&&styles.tabActive]}>{tab.label}</Text></Pressable>)}</View>
+      <View style={styles.tabBar}>{tabs.map(tab=><Pressable accessibilityRole="button" key={tab.label} onPress={()=>{setSection(tab.label);setDetail("");}} style={styles.tab}><Text style={[styles.tabIcon,section===tab.label&&styles.tabActive]}>{tab.icon}</Text><Text style={[styles.tabLabel,section===tab.label&&styles.tabActive]}>{tab.label}</Text></Pressable>)}</View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:{flex:1,backgroundColor:"#F6F6F6"}, loginWrap:{flexGrow:1,justifyContent:"center",padding:28},
+  safe:{flex:1,backgroundColor:"#F6F6F6"}, loading:{flex:1,alignItems:"center",justifyContent:"center",gap:14}, loginWrap:{flexGrow:1,justifyContent:"center",padding:28},
   brandMark:{width:58,height:58,borderRadius:18,backgroundColor:RED,alignItems:"center",justifyContent:"center",marginBottom:22},
   brandStar:{fontSize:32,color:"#fff"}, eyebrow:{fontSize:10,fontWeight:"800",letterSpacing:2,color:RED},
   logo:{fontSize:30,fontWeight:"900",color:"#171717",marginTop:5},logoRed:{color:RED},
@@ -118,7 +173,9 @@ const styles = StyleSheet.create({
   input:{height:54,borderWidth:1,borderColor:"#E1E1E1",borderRadius:13,backgroundColor:"#fff",paddingHorizontal:16,fontSize:15,color:"#171717"},
   primaryButton:{height:54,backgroundColor:RED,borderRadius:13,alignItems:"center",justifyContent:"center",marginTop:24},
   primaryButtonText:{fontSize:15,fontWeight:"800",color:"#fff"},pressed:{opacity:0.78,transform:[{scale:0.99}]},disabled:{opacity:0.65},
-  error:{color:"#B00020",fontSize:13,marginTop:12},loginFoot:{textAlign:"center",color:"#999",fontSize:11,marginTop:38},
+  error:{color:"#B00020",fontSize:13,marginTop:12},loginFoot:{textAlign:"center",color:"#999",fontSize:11,marginTop:28,lineHeight:17},
+  demoButton:{marginTop:14,padding:15,borderRadius:13,borderWidth:1,borderColor:"#DDDDDD",backgroundColor:"#FFFFFF",alignItems:"center"},demoButtonText:{fontSize:13,fontWeight:"800",color:"#333"},
+  demoBanner:{backgroundColor:"#FFF3CD",paddingHorizontal:10,paddingVertical:8},demoBannerText:{fontSize:9,fontWeight:"900",color:"#735C12",textAlign:"center",letterSpacing:0.5},
   header:{height:74,backgroundColor:"#fff",paddingHorizontal:20,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderBottomWidth:1,borderBottomColor:"#ECECEC"},
   headerEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.8,color:RED},headerTitle:{fontSize:20,fontWeight:"900",color:"#191919",marginTop:3},
   avatar:{width:40,height:40,borderRadius:20,backgroundColor:"#191919",alignItems:"center",justifyContent:"center"},avatarText:{color:"#fff",fontWeight:"800",fontSize:16},
@@ -135,7 +192,7 @@ const styles = StyleSheet.create({
   back:{marginBottom:16},backText:{fontSize:13,fontWeight:"800",color:RED},detailPanel:{backgroundColor:"#fff",borderRadius:18,padding:22,borderWidth:1,borderColor:"#ECECEC"},
   detailIcon:{width:52,height:52,borderRadius:15,backgroundColor:"#FFF0F1",alignItems:"center",justifyContent:"center",marginBottom:18},
   detailTitle:{fontSize:23,fontWeight:"900",color:"#191919"},detailText:{fontSize:14,lineHeight:22,color:"#777",marginTop:10},
-  note:{fontSize:12,color:"#666",backgroundColor:"#F7F7F7",padding:13,borderRadius:10,marginTop:18},
+  note:{fontSize:12,color:"#666",backgroundColor:"#F7F7F7",padding:13,borderRadius:10,marginTop:18,lineHeight:18},
 });
 
 export default function App() { return <SafeAreaProvider><AppContent /></SafeAreaProvider>; }
