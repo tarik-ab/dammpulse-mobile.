@@ -17,12 +17,7 @@ npx expo start
 
 ## Generar APK de pruebas
 
-1. Instala EAS CLI: `npm install -g eas-cli`
-2. Inicia sesión: `eas login`
-3. Configura el proyecto: `eas build:configure`
-4. Genera APK Android: `eas build --platform android --profile preview`
-
-El perfil `preview` está configurado para producir un APK instalable. Para Google Play se preparará un AAB con el perfil `production`.
+El repositorio incluye GitHub Actions para compilar automáticamente un APK Android de depuración al actualizar `main` o manualmente desde Actions. El artefacto se publica como `dammpulse-360-prototype-apk`.
 
 ## Arquitectura inicial
 
