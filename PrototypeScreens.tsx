@@ -27,6 +27,7 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
   const [notice,setNotice]=useState("");
   const [search,setSearch]=useState("");
   const [form,setForm]=useState(false);
+  const [editingId,setEditingId]=useState<number|null>(null);
   const [draft,setDraft]=useState<Row>({});
   const [answer,setAnswer]=useState("");
   const [sources,setSources]=useState<Row[]>([]);
@@ -41,15 +42,18 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
     if(!route||!token||demoMode)return;
     setBusy(true);setError("");setNotice("");
     try{
-      const q=search.trim()? `?search=${encodeURIComponent(search.trim())}`:"";
+      const params:string[]=[];
+      if(search.trim())params.push("search="+encodeURIComponent(search.trim()));
+      if(isAdmin&&(name==="Academia"||name==="Conocimiento experto"))params.push("includeDrafts=true");
+      const q=params.length?"?"+params.join("&"):"";
       const data=await request(token,route+q);
       setItems(Array.isArray(data.items)?data.items:[]);
       setProgress(Array.isArray(data.progress)?data.progress:[]);
     }catch(e){setError(e instanceof Error?e.message:"No se han podido cargar los datos.");}
     finally{setBusy(false);}
-  },[route,token,demoMode,search]);
+  },[route,token,demoMode,search,isAdmin,name]);
 
-  useEffect(()=>{setItems([]);setProgress([]);setDraft({});setSearch("");setForm(false);setAnswer("");setSources([]);setError("");setNotice("");},[name,demoMode]);
+  useEffect(()=>{setItems([]);setProgress([]);setDraft({});setSearch("");setForm(false);setEditingId(null);setAnswer("");setSources([]);setError("");setNotice("");},[name,demoMode]);
   useEffect(()=>{if(!demoMode)void refresh();},[refresh,demoMode]);
 
   function input(key:string,placeholder:string,multiline=false){
@@ -86,6 +90,13 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
       setSearch(code);setNotice("Equipo localizado mediante QR.");
     }catch(e){setItems([]);setError(e instanceof Error?e.message:"No se ha podido localizar el equipo.");}
   }
+  function editItem(item:Row){
+    if(name==="Equipos")setDraft({code:item.code,name:item.name,area:item.area,description:item.description,status:item.status});
+    if(name==="Academia")setDraft({title:item.title,description:item.description,content:item.content,duration:String(item.durationMinutes||0),published:item.published?"sí":"no"});
+    if(name==="Conocimiento experto")setDraft({title:item.title,category:item.category,body:item.body,tags:item.tags,status:item.status});
+    if(name==="Producto Damm")setDraft({sku:item.sku,name:item.name,category:item.category,format:item.format,description:item.description});
+    setEditingId(Number(item.id));setForm(true);setError("");setNotice("");
+  }
   async function save(){
     setError("");setNotice("");
     let path="",payload:Row={};
@@ -94,8 +105,13 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
     if(name==="Academia"){path="/api/academy/courses";payload={title:draft.title,description:draft.description,content:draft.content,durationMinutes:Number(draft.duration)||0,published:draft.published==="sí"};}
     if(name==="Conocimiento experto"){path="/api/knowledge";payload={title:draft.title,category:draft.category,body:draft.body,tags:draft.tags,status:draft.status||"draft"};}
     if(name==="Producto Damm"){path="/api/products";payload={sku:draft.sku,name:draft.name,category:draft.category,format:draft.format,description:draft.description};}
-    try{await request(token,path,"POST",payload);setNotice("Guardado en la plataforma.");setDraft({});setForm(false);await refresh();}
-    catch(e){setError(e instanceof Error?e.message:"No se ha podido guardar.");}
+    const method=editingId?"PATCH":"POST";
+    if(editingId)path+="/"+editingId;
+    try{
+      await request(token,path,method,payload);
+      setNotice(editingId?"Registro actualizado.":"Guardado en la plataforma.");
+      setDraft({});setForm(false);setEditingId(null);await refresh();
+    }catch(e){setError(e instanceof Error?e.message:"No se ha podido guardar.");}
   }
   async function patchIncident(item:Row,status:string){
     try{await request(token,`/api/incidents/${item.id}`,"PATCH",{status});setNotice("Incidencia actualizada.");await refresh();}
@@ -142,18 +158,18 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
   return <View style={st.wrap}>
     <Text style={st.body}>{name==="Equipos"?"Inventario compartido de equipos.":name==="Incidencias"?"Registro y seguimiento compartido de incidencias.":name==="Academia"?"Cursos publicados y progreso individual.":name==="Conocimiento experto"?"Procedimientos y artículos aprobados.":"Catálogo de producto compartido."}</Text>
     {(name==="Equipos"||name==="Conocimiento experto"||name==="Producto Damm")&&<View style={st.row}><View style={st.grow}><TextInput value={search} onChangeText={setSearch} placeholder="Buscar…" placeholderTextColor="#999" style={st.input}/></View>{button("Buscar",()=>{void refresh();},true)}</View>}
-    <View style={st.row}>{button(busy?"Cargando…":"Actualizar",()=>{void refresh();},true,busy)}{name==="Equipos"&&button(scanning?"Cerrar lector QR":"Leer QR",()=>{if(scanning)setScanning(false);else void scanEquipment();},true)}{canCreate&&button(form?"Cerrar":"Añadir",()=>setForm(v=>!v),true)}</View>
+    <View style={st.row}>{button(busy?"Cargando…":"Actualizar",()=>{void refresh();},true,busy)}{name==="Equipos"&&button(scanning?"Cerrar lector QR":"Leer QR",()=>{if(scanning)setScanning(false);else void scanEquipment();},true)}{canCreate&&button(form?"Cerrar":"Añadir",()=>{setEditingId(null);setDraft({});setForm(v=>!v);},true)}</View>
     {scanning&&<View style={st.cameraWrap}><CameraView style={st.camera} facing="back" barcodeScannerSettings={{barcodeTypes:["qr"]}} onBarcodeScanned={({data})=>{void lookupQr(data);}}/><Text style={st.meta}>Enfoca el código QR del equipo dentro del marco de cámara.</Text>{button("Cancelar lectura",()=>setScanning(false),true)}</View>}
-    {form&&<View style={st.form}><Text style={st.title}>{name==="Incidencias"?"Nueva incidencia":"Nuevo registro"}</Text>{fields}{button("Guardar",()=>{void save();})}</View>}
+    {form&&<View style={st.form}><Text style={st.title}>{editingId?"Editar registro":name==="Incidencias"?"Nueva incidencia":"Nuevo registro"}</Text>{fields}{button(editingId?"Guardar cambios":"Guardar",()=>{void save();})}</View>}
     {!!notice&&<Text style={st.success}>{notice}</Text>}
     {!!error&&<Text accessibilityRole="alert" style={st.error}>{error}</Text>}
     {busy&&items.length===0&&<ActivityIndicator color="#E30613"/>}
     {!busy&&items.length===0&&<View style={st.card}><Text style={st.title}>Sin registros todavía</Text><Text style={st.meta}>No se muestran datos ficticios. El administrador debe cargar información real o publicar el contenido.</Text></View>}
-    {name==="Equipos"&&items.map(x=>card(`${x.name} · ${x.code}`,[x.area,x.status].filter(Boolean).join(" · "),x.description))}
+    {name==="Equipos"&&items.map(x=>card(String(x.name)+" · "+String(x.code),[x.area,x.status].filter(Boolean).join(" · "),x.description,isAdmin?button("Editar",()=>editItem(x),true):null))}
     {name==="Incidencias"&&items.map(x=>{const editable=isAdmin||Number(x.createdBy)===Number(userId);return card(`#${x.id} · ${x.title}`,[x.priority,x.status,x.equipmentCode].filter(Boolean).join(" · "),x.description,editable&&x.status!=="resuelta"?<View style={st.row}>{x.status==="abierta"&&button("En curso",()=>{void patchIncident(x,"en_curso");},true)}{button("Resolver",()=>{void patchIncident(x,"resuelta");},true)}</View>:null);})}
-    {name==="Academia"&&items.map(x=>{const p=progress.find(y=>Number(y.courseId)===Number(x.id));return card(String(x.title),[`${x.durationMinutes||0} min`,p?.status==="completed"?"Completado":p?.status==="in_progress"?"En curso":"Sin empezar"].join(" · "),[x.description,x.content].filter(Boolean).join("\n\n"),p?.status==="completed"?<Text style={st.success}>Completado</Text>:button(p?.status==="in_progress"?"Marcar completado":"Empezar",()=>{void courseProgress(Number(x.id),p?.status==="in_progress"?"completed":"in_progress");},true));})}
-    {name==="Conocimiento experto"&&items.map(x=>card(String(x.title),String(x.category||"General"),String(x.body||"")))}
-    {name==="Producto Damm"&&items.map(x=>card(`${x.name} · ${x.sku}`,[x.category,x.format].filter(Boolean).join(" · "),x.description))}
+    {name==="Academia"&&items.map(x=>{const p=progress.find(y=>Number(y.courseId)===Number(x.id));return card(String(x.title),[String(x.durationMinutes||0)+" min",x.published?"Publicado":"Borrador",p?.status==="completed"?"Completado":p?.status==="in_progress"?"En curso":"Sin empezar"].join(" · "),[x.description,x.content].filter(Boolean).join("\n\n"),<View style={st.row}>{x.published&&p?.status!=="completed"?button(p?.status==="in_progress"?"Marcar completado":"Empezar",()=>{void courseProgress(Number(x.id),p?.status==="in_progress"?"completed":"in_progress");},true):p?.status==="completed"?<Text style={st.success}>Completado</Text>:null}{isAdmin&&button("Editar",()=>editItem(x),true)}</View>);})}
+    {name==="Conocimiento experto"&&items.map(x=>card(String(x.title),String(x.category||"General")+" · "+String(x.status||""),String(x.body||""),isAdmin?button("Editar",()=>editItem(x),true):null))}
+    {name==="Producto Damm"&&items.map(x=>card(String(x.name)+" · "+String(x.sku),[x.category,x.format].filter(Boolean).join(" · "),x.description,isAdmin?button("Editar",()=>editItem(x),true):null))}
   </View>;
 }
 
