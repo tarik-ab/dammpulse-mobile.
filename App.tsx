@@ -30,7 +30,7 @@ function AppContent() {
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ identifier: username.trim(), password }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || data.error || "No se ha podido iniciar sesión.");
