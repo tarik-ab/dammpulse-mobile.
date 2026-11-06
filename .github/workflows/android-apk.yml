@@ -28,6 +28,10 @@ jobs:
         run: npx tsc --noEmit
       - name: Generate clean native Android project
         run: CI=1 npx expo prebuild --platform android --clean
+      - name: Diagnose Expo Android autolinking metadata
+        run: |
+          npx expo-modules-autolinking resolve --platform android --json > /tmp/expo-autolinking.json
+          node -e "const c=require('/tmp/expo-autolinking.json'); console.log(JSON.stringify((c.modules||[]).map((m,i)=>({index:i,name:m.name,projects:(m.projects||[]).map(p=>({name:p.name,publication:p.publication}))})),null,2))"
       - name: Build installable debug APK
         working-directory: android
         run: ./gradlew assembleDebug --stacktrace
