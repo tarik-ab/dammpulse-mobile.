@@ -60,7 +60,8 @@ function AppContent() {
           <Pressable onPress={signIn} disabled={busy} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Entrar  →</Text>}
           </Pressable>
-          <Text style={styles.loginFoot}>DammPulse 360 · Entorno móvil</Text>
+          <Pressable onPress={() => { setUsername(username || "Invitado"); setAuthenticated(true); setError(""); }} style={{marginTop:14,padding:15,borderRadius:13,borderWidth:1,borderColor:"#DDDDDD",backgroundColor:"#FFFFFF",alignItems:"center"}}><Text style={{fontSize:13,fontWeight:"800",color:"#333"}}>Entrar en modo demostración</Text></Pressable>
+          <Text style={styles.loginFoot}>El modo demostración utiliza datos locales de ejemplo.</Text>
         </ScrollView>
       </SafeAreaView>
     );
