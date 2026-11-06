@@ -24,6 +24,8 @@ jobs:
         run: npx expo install --fix
       - name: Install Expo system UI module
         run: npx expo install expo-system-ui
+      - name: Align Expo Font module
+        run: npx expo install expo-font
       - name: TypeScript check
         run: npx tsc --noEmit
       - name: Generate clean native Android project
