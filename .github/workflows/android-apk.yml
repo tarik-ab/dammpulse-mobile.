@@ -3,9 +3,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,6 +30,8 @@ jobs:
         run: npx expo install expo-system-ui
       - name: Align Expo Font module
         run: npx expo install expo-font
+      - name: Expo diagnostics
+        run: npx expo-doctor
       - name: TypeScript check
         run: npx tsc --noEmit
       - name: Generate clean native Android project
@@ -36,7 +42,7 @@ jobs:
           node -e "const c=require('/tmp/expo-autolinking.json'); console.log(JSON.stringify((c.modules||[]).map((m,i)=>({index:i,name:m.name,projects:(m.projects||[]).map(p=>({name:p.name,publication:p.publication}))})),null,2))"
       - name: Build installable debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --max-workers=2 --console=plain --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
