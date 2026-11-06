@@ -22,6 +22,15 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite a DammPulse escanear códigos QR para identificar equipos.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ]
   }
 }
