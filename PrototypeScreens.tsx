@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
 
 const API = "https://dammpulse-api-production.up.railway.app";
 type Row = { [key: string]: any };
@@ -29,7 +30,7 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
   const [draft,setDraft]=useState<Row>({});
   const [answer,setAnswer]=useState("");
   const [sources,setSources]=useState<Row[]>([]);
-  const [asking,setAsking]=useState(false);
+  const [asking,setAsking]=useState(false);\n  const [permission,requestPermission]=useCameraPermissions();\n  const [scanning,setScanning]=useState(false);
 
   const route = name==="Equipos"?"/api/equipment":name==="Incidencias"?"/api/incidents":
     name==="Academia"?"/api/academy/courses":name==="Conocimiento experto"?"/api/knowledge":
@@ -59,6 +60,28 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
   }
   function card(title:string,meta:string,body?:string,actions?:React.ReactNode){
     return <View key={title} style={st.card}><Text style={st.title}>{title}</Text>{!!meta&&<Text style={st.meta}>{meta}</Text>}{!!body&&<Text style={st.body}>{body}</Text>}{actions}</View>;
+  }
+
+  async function scanEquipment(){
+    if(!permission?.granted){
+      const result=await requestPermission();
+      if(!result.granted){setError("Necesitas conceder permiso de cámara para leer el QR.");return;}
+    }
+    setError("");setScanning(true);
+  }
+  async function lookupQr(raw:string){
+    setScanning(false);setError("");setNotice("");
+    let code=raw.trim();
+    if(code.startsWith("{")){
+      try{const parsed=JSON.parse(code);code=String(parsed.code||parsed.sku||parsed.id||code);}catch{/* keep raw QR value */}
+    }else if(/^https?:\\/\\//i.test(code)){
+      try{const parsed=new URL(code);code=decodeURIComponent(parsed.pathname.split("/").filter(Boolean).pop()||code);}catch{/* expect a raw code */}
+    }
+    try{
+      const data=await request(token,"/api/equipment/code/"+encodeURIComponent(code));
+      setItems(data.item?[data.item]:[]);
+      setSearch(code);setNotice("Equipo localizado mediante QR.");
+    }catch(e){setItems([]);setError(e instanceof Error?e.message:"No se ha podido localizar el equipo.");}
   }
   async function save(){
     setError("");setNotice("");
@@ -116,7 +139,7 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
   return <View style={st.wrap}>
     <Text style={st.body}>{name==="Equipos"?"Inventario compartido de equipos.":name==="Incidencias"?"Registro y seguimiento compartido de incidencias.":name==="Academia"?"Cursos publicados y progreso individual.":name==="Conocimiento experto"?"Procedimientos y artículos aprobados.":"Catálogo de producto compartido."}</Text>
     {(name==="Equipos"||name==="Conocimiento experto"||name==="Producto Damm")&&<View style={st.row}><View style={st.grow}>{input("search","Buscar…")}</View>{button("Buscar",()=>{void refresh();},true)}</View>}
-    <View style={st.row}>{button(busy?"Cargando…":"Actualizar",()=>{void refresh();},true,busy)}{canCreate&&button(form?"Cerrar":"Añadir",()=>setForm(v=>!v),true)}</View>
+    <View style={st.row}>{button(busy?"Cargando…":"Actualizar",()=>{void refresh();},true,busy)}{name==="Equipos"&&button(scanning?"Cerrar lector QR":"Leer QR",()=>{if(scanning)setScanning(false);else void scanEquipment();},true)}{canCreate&&button(form?"Cerrar":"Añadir",()=>setForm(v=>!v),true)}</View>\n    {scanning&&<View style={st.cameraWrap}><CameraView style={st.camera} facing="back" barcodeScannerSettings={{barcodeTypes:["qr"]}} onBarcodeScanned={({data})=>{void lookupQr(data);}}/><Text style={st.meta}>Enfoca el código QR del equipo dentro del marco de cámara.</Text>{button("Cancelar lectura",()=>setScanning(false),true)}</View>}
     {form&&<View style={st.form}><Text style={st.title}>{name==="Incidencias"?"Nueva incidencia":"Nuevo registro"}</Text>{fields}{button("Guardar",()=>{void save();})}</View>}
     {!!notice&&<Text style={st.success}>{notice}</Text>}
     {!!error&&<Text accessibilityRole="alert" style={st.error}>{error}</Text>}
@@ -131,7 +154,7 @@ export default function PrototypeScreens({ name, token = "", demoMode = false, i
 }
 
 const st=StyleSheet.create({
-  wrap:{gap:11,marginTop:16},row:{flexDirection:"row",gap:8,alignItems:"center",flexWrap:"wrap"},grow:{flex:1},
+  wrap:{gap:11,marginTop:16},cameraWrap:{backgroundColor:"#fff",padding:10,borderRadius:12,gap:8,borderWidth:1,borderColor:"#eee"},camera:{height:250,width:"100%",borderRadius:10,overflow:"hidden"},row:{flexDirection:"row",gap:8,alignItems:"center",flexWrap:"wrap"},grow:{flex:1},
   input:{minHeight:44,borderWidth:1,borderColor:"#E2E2E2",borderRadius:10,backgroundColor:"#fff",paddingHorizontal:12,paddingVertical:10,fontSize:13,color:"#222",marginBottom:7},
   multi:{minHeight:86,textAlignVertical:"top"},primary:{backgroundColor:"#E30613",padding:13,borderRadius:10,alignItems:"center"},primaryText:{color:"#fff",fontWeight:"800",fontSize:12},
   secondary:{backgroundColor:"#fff",padding:12,borderRadius:10,borderWidth:1,borderColor:"#ddd",alignItems:"center"},secondaryText:{color:"#333",fontWeight:"800",fontSize:12},
