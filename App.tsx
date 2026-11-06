@@ -11,7 +11,7 @@ const API_URL = "https://dammpulse-api-production.up.railway.app";
 const SESSION_KEY = "dammpulse.session.v1";
 const RED = "#E30613";
 type Section = "Inicio" | "Equipos" | "Incidencias" | "Academia" | "Más";
-type SessionUser = { name?: string; username?: string; email?: string; role?: string };
+type SessionUser = { id?: number; name?: string; username?: string; email?: string; role?: string };
 type Session = { token: string; user?: SessionUser };
 const tabs: { label: Section; icon: string }[] = [
   { label: "Inicio", icon: "⌂" }, { label: "Equipos", icon: "▦" },
@@ -151,9 +151,8 @@ function AppContent() {
           <View style={styles.grid}>{cards.map(card => <Pressable key={card.title} accessibilityRole="button" onPress={() => open(card.target)} style={({pressed})=>[styles.moduleCard,pressed&&styles.pressed]}><View style={styles.moduleIcon}><Text style={styles.moduleIconText}>{card.icon}</Text></View><Text style={styles.moduleTitle}>{card.title}</Text><Text style={styles.moduleSubtitle}>{card.subtitle}</Text><Text style={styles.cardArrow}>Abrir  →</Text></Pressable>)}</View>
         </> : <>
           <Pressable onPress={() => { setDetail(""); setSection("Inicio"); }} style={styles.back}><Text style={styles.backText}>‹  Volver al inicio</Text></Pressable>
-          <View style={styles.detailPanel}><View style={styles.detailIcon}><Text style={styles.moduleIconText}>{cards.find(c=>c.target===title)?.icon || "✦"}</Text></View><Text style={styles.detailTitle}>{title}</Text><Text style={styles.detailText}>Contenido del módulo</Text><PrototypeScreens name={title} />
-          {title === "DAM Bot" && <Text style={styles.note}>El asistente todavía no está conectado a un modelo ni a documentación corporativa. No introduzcas información confidencial en esta demostración.</Text>}
-          {title !== "DAM Bot" && <Text style={styles.note}>Contenido de muestra. Este módulo aún no está conectado a registros operativos compartidos.</Text>}
+          <View style={styles.detailPanel}><View style={styles.detailIcon}><Text style={styles.moduleIconText}>{cards.find(c=>c.target===title)?.icon || "✦"}</Text></View><Text style={styles.detailTitle}>{title}</Text><Text style={styles.detailText}>Contenido del módulo</Text><PrototypeScreens name={title} token={token} demoMode={demoMode} isAdmin={user?.role === "admin"} userId={user?.id} />
+          
           <Pressable onPress={() => { setDetail(""); setSection("Inicio"); }} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Volver al panel  →</Text></Pressable></View>
         </>}
         <Text style={styles.footer}>DAMMPULSE 360  ·  MOBILE</Text>
