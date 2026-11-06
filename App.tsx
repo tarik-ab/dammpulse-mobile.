@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Pressable, ScrollView, StatusBar, StyleSheet,
   Text, TextInput, View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const API_URL = "https://dammpulse-api-production.up.railway.app";
 const RED = "#E30613";
@@ -14,7 +14,7 @@ const tabs: { label: Section; icon: string }[] = [
   { label: "Más", icon: "•••" },
 ];
 
-export default function App() {
+function AppContent() {
   const [authenticated, setAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -135,3 +135,5 @@ const styles = StyleSheet.create({
   detailTitle:{fontSize:23,fontWeight:"900",color:"#191919"},detailText:{fontSize:14,lineHeight:22,color:"#777",marginTop:10},
   note:{fontSize:12,color:"#666",backgroundColor:"#F7F7F7",padding:13,borderRadius:10,marginTop:18},
 });
+
+export default function App() { return <SafeAreaProvider><AppContent /></SafeAreaProvider>; }
