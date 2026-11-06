@@ -22,13 +22,15 @@ jobs:
         run: npm install
       - name: Align Expo SDK native dependencies
         run: npx expo install --fix
+      - name: Install Expo system UI module
+        run: npx expo install expo-system-ui
       - name: TypeScript check
         run: npx tsc --noEmit
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --non-interactive
+      - name: Generate clean native Android project
+        run: CI=1 npx expo prebuild --platform android --clean
       - name: Build installable debug APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
