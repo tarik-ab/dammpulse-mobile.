@@ -40,6 +40,34 @@ function AppContent() {
   const [section, setSection] = useState<Section>("Inicio");
   const [detail, setDetail] = useState("");
 
+  const [dashboard, setDashboard] = useState({ equipment: 0, incidents: 0, critical: 0, courses: 0 });
+  const [dashboardBusy, setDashboardBusy] = useState(false);
+  const [dashboardError, setDashboardError] = useState("");
+  const loadDashboard = useCallback(async () => {
+    if (!token || demoMode) return;
+    setDashboardBusy(true); setDashboardError("");
+    try {
+      const headers = { Accept: "application/json", Authorization: "Bearer " + token };
+      const paths = ["/api/equipment", "/api/incidents", "/api/academy/courses"];
+      const responses = await Promise.all(paths.map(path => fetch(API_URL + path, { headers })));
+      const payloads = await Promise.all(responses.map(async response => {
+        const raw = await response.text(); let data: any = {};
+        try { data = raw ? JSON.parse(raw) : {}; } catch { /* invalid response */ }
+        if (!response.ok) throw new Error(data.error || "Error del servidor (" + response.status + ").");
+        return Array.isArray(data.items) ? data.items : [];
+      }));
+      const equipment = payloads[0], incidents = payloads[1], courses = payloads[2];
+      const open = incidents.filter((x: any) => !["resuelta", "closed", "resolved"].includes(String(x.status || "").toLowerCase()));
+      const critical = open.filter((x: any) => ["critica", "crítica", "critical", "alta", "high"].includes(String(x.priority || "").toLowerCase()));
+      setDashboard({ equipment: equipment.length, incidents: open.length, critical: critical.length, courses: courses.filter((x: any) => x.published).length });
+    } catch (e) { setDashboardError(e instanceof Error ? e.message : "No se han podido cargar los indicadores."); }
+    finally { setDashboardBusy(false); }
+  }, [token, demoMode]);
+
+  useEffect(() => {
+    if (authenticated && !demoMode && section === "Inicio" && !detail) void loadDashboard();
+  }, [authenticated, demoMode, section, detail, loadDashboard]);
+
   const clearSession = useCallback(async () => {
     try { await SecureStore.deleteItemAsync(SESSION_KEY); } catch { /* storage may be unavailable */ }
     setToken(""); setUser(undefined); setAuthenticated(false); setDemoMode(false);
@@ -146,8 +174,17 @@ function AppContent() {
       {demoMode && <View style={styles.demoBanner}><Text style={styles.demoBannerText}>MODO DEMOSTRACIÓN · DATOS DE EJEMPLO · SIN CONEXIÓN A CUENTA</Text></View>}
       <ScrollView contentContainerStyle={styles.content}>
         {section === "Inicio" && !detail ? <>
-          <View style={styles.hero}><Text style={styles.heroEyebrow}>TU ENTORNO DE TRABAJO</Text><Text style={styles.heroTitle}>Todo conectado.{"\n"}Todo bajo control.</Text><Text style={styles.heroText}>Accede rápidamente a las herramientas de tu planta.</Text><View style={styles.heroAccent} /></View>
-          <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Accesos directos</Text><Text style={styles.sectionHint}>Selecciona un módulo</Text></View>
+          <View style={styles.hero}><Text style={styles.heroEyebrow}>CENTRO DE CONTROL 360</Text><Text style={styles.heroTitle}>La planta, de un vistazo.</Text><Text style={styles.heroText}>Indicadores operativos conectados a equipos, incidencias y formación.</Text><View style={styles.heroAccent} /></View>
+          {demoMode ? <Text style={styles.demoMetricNote}>MODO DEMOSTRACIÓN · INDICADORES SIMULADOS, NO SON DATOS REALES</Text> : null}
+          <View style={styles.kpiGrid}>
+            <View style={styles.kpiCard}><Text style={styles.kpiValue}>{demoMode ? "24" : dashboard.equipment}</Text><Text style={styles.kpiLabel}>EQUIPOS</Text></View>
+            <View style={styles.kpiCard}><Text style={styles.kpiValue}>{demoMode ? "3" : dashboard.incidents}</Text><Text style={styles.kpiLabel}>INCIDENCIAS ABIERTAS</Text></View>
+            <View style={styles.kpiCard}><Text style={[styles.kpiValue, styles.kpiAlert]}>{demoMode ? "1" : dashboard.critical}</Text><Text style={styles.kpiLabel}>PRIORIDAD ALTA</Text></View>
+            <View style={styles.kpiCard}><Text style={styles.kpiValue}>{demoMode ? "8" : dashboard.courses}</Text><Text style={styles.kpiLabel}>CURSOS PUBLICADOS</Text></View>
+          </View>
+          {!demoMode && dashboardError ? <Text style={styles.error}>{dashboardError}</Text> : null}
+          {!demoMode ? <Pressable onPress={() => { void loadDashboard(); }} style={styles.refreshDashboard}><Text style={styles.refreshDashboardText}>{dashboardBusy ? "Actualizando indicadores…" : "↻  Actualizar indicadores"}</Text></Pressable> : null}
+          <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Accesos directos</Text><Text style={styles.sectionHint}>Actúa desde un único panel</Text></View>
           <View style={styles.grid}>{cards.map(card => <Pressable key={card.title} accessibilityRole="button" onPress={() => open(card.target)} style={({pressed})=>[styles.moduleCard,pressed&&styles.pressed]}><View style={styles.moduleIcon}><Text style={styles.moduleIconText}>{card.icon}</Text></View><Text style={styles.moduleTitle}>{card.title}</Text><Text style={styles.moduleSubtitle}>{card.subtitle}</Text><Text style={styles.cardArrow}>Abrir  →</Text></Pressable>)}</View>
         </> : section === "Más" && !detail ? <>
           <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Más herramientas</Text><Text style={styles.sectionHint}>Conocimiento, producto y asistencia documental</Text></View>
@@ -195,6 +232,9 @@ const styles = StyleSheet.create({
   detailIcon:{width:52,height:52,borderRadius:15,backgroundColor:"#FFF0F1",alignItems:"center",justifyContent:"center",marginBottom:18},
   detailTitle:{fontSize:23,fontWeight:"900",color:"#191919"},detailText:{fontSize:14,lineHeight:22,color:"#777",marginTop:10},
   note:{fontSize:12,color:"#666",backgroundColor:"#F7F7F7",padding:13,borderRadius:10,marginTop:18,lineHeight:18},
+  kpiGrid:{flexDirection:"row",flexWrap:"wrap",gap:10,marginTop:14},kpiCard:{width:"48%",flexGrow:1,minHeight:86,backgroundColor:"#fff",borderRadius:14,padding:14,borderWidth:1,borderColor:"#ECECEC",justifyContent:"center"},
+  kpiValue:{fontSize:27,fontWeight:"900",color:"#191919"},kpiAlert:{color:RED},kpiLabel:{fontSize:9,fontWeight:"900",letterSpacing:0.8,color:"#888",marginTop:4},
+  demoMetricNote:{fontSize:9,fontWeight:"800",color:"#8A6815",marginTop:10},refreshDashboard:{alignSelf:"flex-start",paddingVertical:10,paddingHorizontal:12,backgroundColor:"#fff",borderRadius:10,marginTop:10,borderWidth:1,borderColor:"#eee"},refreshDashboardText:{fontSize:11,fontWeight:"800",color:RED},
 });
 
 export default function App() { return <SafeAreaProvider><AppContent /></SafeAreaProvider>; }
