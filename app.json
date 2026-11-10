@@ -13,7 +13,8 @@
     "android": {
       "package": "com.dammpulse.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/damm-plus-app-icon.png"
       },
       "edgeToEdgeEnabled": true
     },
@@ -31,6 +32,7 @@
           "recordAudioAndroid": false
         }
       ]
-    ]
+    ],
+    "icon": "./assets/damm-plus-app-icon.png"
   }
 }
