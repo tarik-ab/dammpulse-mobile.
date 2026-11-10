@@ -24,6 +24,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Download Damm Plus app icon
+        run: |
+          mkdir -p assets
+          curl -fL https://raw.githubusercontent.com/tarik-ab/damm-pulse/main/damm-plus-app-icon.png -o assets/damm-plus-app-icon.png
       - name: Install dependencies
         run: npm install
       - name: Align Expo SDK native dependencies
