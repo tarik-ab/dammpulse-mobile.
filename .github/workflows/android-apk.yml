@@ -1,8 +1,10 @@
-name: Build Android prototype APK
+name: Build and publish DammPulse Android APK
 on:
   push:
     branches: [main]
   workflow_dispatch:
+permissions:
+  contents: write
 concurrency:
   group: android-apk-${{ github.ref }}
   cancel-in-progress: true
@@ -43,10 +45,17 @@ jobs:
       - name: Build installable debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --max-workers=2 --console=plain --stacktrace
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: dammpulse-360-prototype-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Publish permanent Android download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: DammPulse 1.0.0
+          make_latest: true
+          files: android/app/build/outputs/apk/debug/app-debug.apk
