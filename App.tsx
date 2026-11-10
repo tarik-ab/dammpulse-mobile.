@@ -9,7 +9,7 @@ import PrototypeScreens from "./PrototypeScreens";
 
 const API_URL = "https://dammpulse-api-production.up.railway.app";
 const SESSION_KEY = "dammpulse.session.v1";
-const RED = "#E30613";
+const RED = "#B8040B";
 type Section = "Inicio" | "Equipos" | "Incidencias" | "Academia" | "Más";
 type SessionUser = { id?: number; name?: string; username?: string; email?: string; role?: string };
 type Session = { token: string; user?: SessionUser };
